@@ -1,0 +1,83 @@
+import datetime
+import json
+import sys
+from pathlib import Path
+
+from actor import generate
+from critic import audit
+from models import Critique
+
+MAX_RETRIES = 2
+
+def run_pipeline(prompt: str, strategy: str = "general") -> str:
+    print(f"🤖 [Actor] Генерація першої чернетки (стратегія: {strategy})...")
+    current_draft = generate(prompt, strategy_prompt=strategy)
+    
+    for attempt in range(1, MAX_RETRIES + 2):
+        print(f"🔍 [Critic] Аудит спроби {attempt}...")
+        critique: Critique = audit(prompt, current_draft, strategy)
+        
+        # ПРИНЦИП 9: Аварійна зупинка, якщо не вистачає інформації (Pre-Flight Check)
+        if critique.missing_info:
+            print("\n⚠️  [АВАРІЙНА ЗУПИНКА] Критик відмовився гадати. Бракує інформації:")
+            for item in critique.missing_info:
+                print(f"   - {item}")
+            print("\n👉 Надайте цю інформацію у наступному запиті.")
+            sys.exit(2)
+            
+        # УСПІХ: Якщо бал високий і немає фатальних помилок
+        if critique.score >= 95 and not critique.fatal_flaws:
+            print(f"✅ [Успіх] Перевірку пройдено! (Оцінка: {critique.score}/100)")
+            log_iteration(prompt, current_draft, critique, success=True)
+            return current_draft
+            
+        # ПЕРЕГЕНЕРАЦІЯ: Якщо бал < 95, Критик повертає правки Актору
+        print(f"⚠️  [Спроба {attempt}] Оцінка {critique.score}/100. Знайдено проблеми:")
+        for flaw in critique.fatal_flaws:
+            print(f"   ✖ {flaw}")
+            
+        if attempt <= MAX_RETRIES:
+            print("↻  [Actor] Виправлення помилок на основі зауважень Критика...")
+            correction_instructions = "\n".join(critique.corrections)
+            current_draft = generate(
+                f"ЗАВДАННЯ: {prompt}\n\nПОПЕРЕДНЯ ЧЕРНЕТКА:\n{current_draft}\n\nВКАЗІВКИ КРИТИКА ДЛЯ ВИПРАВЛЕННЯ:\n{correction_instructions}",
+                strategy_prompt=strategy
+            )
+        else:
+            print(f"⚠️ [BEST EFFORT] Не вдалося досягти 95%, але ось найкраща чернетка (Оцінка: {critique.score}/100):")
+            print(current_draft)
+            print("\nНерозв'язані проблеми:")
+            for flaw in critique.fatal_flaws:
+                print(f"   ✖ {flaw}")
+            log_iteration(prompt, current_draft, critique, success=False)
+            sys.exit(1)
+
+def log_iteration(prompt: str, draft: str, critique: Critique, success: bool):
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"run_{timestamp}.json"
+    
+    log_data = {
+        "timestamp": timestamp,
+        "prompt": prompt,
+        "success": success,
+        "final_score": critique.score,
+        "fatal_flaws": critique.fatal_flaws,
+        "missing_info": critique.missing_info,
+        "corrections": critique.corrections,
+        "draft": draft
+    }
+    log_file.write_text(json.dumps(log_data, indent=2, ensure_ascii=False))
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Використання: python pipeline.py '<промпт>' [стратегія]")
+        sys.exit(1)
+    
+    user_prompt = sys.argv[1]
+    strat = sys.argv[2] if len(sys.argv) > 2 else "general"
+    
+    final_output = run_pipeline(user_prompt, strat)
+    print("\n--- ФІНАЛЬНИЙ РЕЗУЛЬТАТ ---")
+    print(final_output)
