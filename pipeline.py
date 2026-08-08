@@ -37,8 +37,14 @@ def run_pipeline(prompt: str, strategy: str = "general") -> str:
                 if user_input.startswith("@") or Path(user_input).is_file():
                     file_path = Path(user_input.lstrip("@"))
                     if file_path.is_file():
-                        content = file_path.read_text(encoding="utf-8", errors="replace")
-                        prompt += f"\n\n[ДОДАТКОВИЙ ФАЙЛ ВІД КОРИСТУВАЧА: {file_path.name}]:\n{content}"
+                        # Перевірка безпеки заборонених імен / розширень
+                        forbidden_names = {".env", "id_rsa"}
+                        forbidden_extensions = {".pem"}
+                        if file_path.name.lower() in forbidden_names or file_path.suffix.lower() in forbidden_extensions:
+                            print(f"\n🚨 [ПОПЕРЕДЖЕННЯ БЕЗПЕКИ] Спроба зчитати чутливий файл ({file_path.name}) заблокована через ризик витоку секретів!")
+                        else:
+                            content = file_path.read_text(encoding="utf-8", errors="replace")
+                            prompt += f"\n\n[ДОДАТКОВИЙ ФАЙЛ ВІД КОРИСТУВАЧА: {file_path.name}]:\n{content}"
                     else:
                         print(f"⚠️ Файл {file_path} не знайдено, передаємо як звичайний текст.")
                         prompt += f"\n\n[УТОЧНЕННЯ]: {user_input}"
