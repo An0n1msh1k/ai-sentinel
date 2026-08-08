@@ -19,7 +19,7 @@ def audit(
         / f"{strategy_prompt}.md"
     )
     if strategy_path.exists():
-        strategy_prompt = strategy_path.read_text(
+        strategy_path = strategy_path.read_text(
             encoding="utf-8", errors="replace"
         )
     else:
@@ -43,7 +43,7 @@ Return ONLY valid JSON with exactly these fields:
 
 Rules:
 - score must be an integer from 0 to 100.
-- fatal_flaws must contain serious errors.
+- fatal_flaws must contain serious errors (such as factual errors, unsafe assumptions, or logical mistakes).
 - missing_info: Use ONLY when input data from the USER is missing.
 - corrections: Must explain exactly what the Actor should fix.
 - All list fields MUST be JSON arrays [], never empty strings.

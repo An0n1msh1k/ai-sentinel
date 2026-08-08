@@ -91,6 +91,7 @@ def run_pipeline(
                             f"\n🚨 [БЕЗПЕКА] Заблоковано "
                             f"чутливий файл: {file_path.name}"
                         )
+                        continue
                     elif (
                         file_path.stat().st_size
                         > MAX_FILE_SIZE_BYTES
@@ -99,6 +100,7 @@ def run_pipeline(
                             f"\n🚨 [БЕЗПЕКА] Файл завеликий: "
                             f"{file_path.name}"
                         )
+                        continue
                     else:
                         content = file_path.read_text(
                             encoding="utf-8",

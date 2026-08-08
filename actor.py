@@ -13,7 +13,7 @@ def generate(
             "role": "system",
             "content": (
                 strategy_prompt
-                or "You are a precise technical assistant."
+                or "You are a precise technical assistant. Never guess when information is missing."
             ),
         },
         {
