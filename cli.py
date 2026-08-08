@@ -151,7 +151,19 @@ def review(
             console.print("[bold red]❌ critic.py has no 'audit' function.[/bold red]")
             raise typer.Exit(code=1)
     except Exception as e: # noqa: BLE001
-        console.print(f"[bold red]❌ Error: {e}[/bold red]")
+        error_msg = str(e)
+        if "429" in error_msg or "RateLimit" in error_msg or "Quota exceeded" in error_msg:
+            console.print(Panel(
+                "[bold yellow]⏳ Rate Limit Exceeded (429)[/bold yellow]\n\n"
+                "The AI API has reached its request limit. The review cannot be completed right now.\n\n"
+                "• [bold]Wait 15-60 seconds[/bold] and try again.\n"
+                "• If you are committing code, bypass this check using:\n"
+                "  [cyan]git commit --no-verify[/cyan]",
+                title="API Quota Error",
+                expand=False,
+            ))
+        else:
+            console.print(f"[bold red]❌ Error: {error_msg}[/bold red]")
         raise typer.Exit(code=1)
 
 @app.callback(invoke_without_command=True)
