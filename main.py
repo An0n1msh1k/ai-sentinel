@@ -6,8 +6,9 @@ from repo import get_repo_diff, get_repo_map
 
 
 def parse_args():
+    """Парсить аргументи командного рядка."""
     parser = argparse.ArgumentParser(
-        description="AI Sentinel — Локальний інженерний верифікатор (Actor-Critic)"
+        description="AI Sentinel — Верифікатор (Actor-Critic)"
     )
     parser.add_argument(
         "prompt",
@@ -16,27 +17,30 @@ def parse_args():
     parser.add_argument(
         "files",
         nargs="*",
-        help="Файли проєкту для аналітика (необов'язково)"
+        help="Файли проєкту для аналітика"
     )
     parser.add_argument(
         "-m", "--map",
         action="store_true",
-        help="Додати структуру Git-репозиторію (repo-map) у контекст запиту"
+        help="Додати структуру Git-репозиторію"
     )
     parser.add_argument(
         "-d", "--diff",
         action="store_true",
-        help="Додати git diff у контекст для Code Review"
+        help="Додати git diff у контекст"
     )
     strategy_dir = Path(__file__).parent / 'strategies'
-    strategies = [f.stem for f in strategy_dir.glob('*.md')] + ['general']
+    strategies = [
+        f.stem for f in strategy_dir.glob('*.md')
+    ] + ['general']
     parser.add_argument(
         "-s", "--strategy",
         default="general",
         choices=strategies,
-        help="Спеціалізована стратегія перевірки (за замовчуванням: general)"
+        help="Спеціалізована стратегія перевірки"
     )
     return parser.parse_args()
+
 
 def build_context(
     prompt: str,
@@ -44,6 +48,7 @@ def build_context(
     include_map: bool = False,
     include_diff: bool = False
 ) -> str:
+    """Формує загальний контекст для виконання запиту."""
     context_parts = []
     if include_map:
         context_parts.append(get_repo_map())
@@ -53,18 +58,30 @@ def build_context(
     if not file_paths:
         context_parts.append(prompt)
     else:
-        context_parts.append(f"ЗАВДАННЯ: {prompt}\n\nКОНТЕКСТ ФАЙЛІВ ПРОЄКТУ:")
+        context_parts.append(
+            f"ЗАВДАННЯ: {prompt}\n\nКОНТЕКСТ ФАЙЛІВ ПРОЄКТУ:"
+        )
         for fp in file_paths:
             path = Path(fp)
             if path.exists() and path.is_file():
-                content = path.read_text(encoding="utf-8", errors="replace")
-                context_parts.append(f"--- ФАЙЛ: {path.name} ---\n{content}\n")
+                content = path.read_text(
+                    encoding="utf-8", errors="replace"
+                )
+                context_parts.append(
+                    f"--- ФАЙЛ: {path.name} ---\n{content}\n"
+                )
             else:
-                print(f"⚠️ Попередження: Файл {fp} не знайдено, пропускаємо.")
+                print(
+                    f"⚠️ Попередження: Файл {fp} не знайдено."
+                )
 
-    return "\n\n".join(context_parts) if (include_map or include_diff) else "\n".join(context_parts)
+    if include_map or include_diff:
+        return "\n\n".join(context_parts)
+    return "\n".join(context_parts)
+
 
 def main():
+    """Точка входу в застосунок."""
     args = parse_args()
     full_prompt = build_context(
         args.prompt,
@@ -73,13 +90,18 @@ def main():
         include_diff=args.diff
     )
 
-    print(f"🚀 [AI Sentinel] Запуск пайплайну (Стратегія: {args.strategy})...")
-    result = run_pipeline(full_prompt, strategy=args.strategy)
+    print(
+        f"🚀 [AI Sentinel] Запуск (Стратегія: {args.strategy})..."
+    )
+    result = run_pipeline(
+        full_prompt, strategy=args.strategy
+    )
 
     print("\n==========================================")
     print("           ВЕРИФІКОВАНИЙ РЕЗУЛЬТАТ        ")
     print("==========================================")
     print(result)
+
 
 if __name__ == "__main__":
     main()

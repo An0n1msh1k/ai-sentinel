@@ -3,19 +3,34 @@ from functools import lru_cache
 from pathlib import Path
 
 
-def get_repo_map(root_dir: Path | None = None, max_files: int = 80) -> str:
-    """Повертає чисту структуру Git-репозиторію (або звичайного каталогу)."""
+def get_repo_map(
+    root_dir: Path | None = None,
+    max_files: int = 80
+) -> str:
+    """Повертає чисту структуру Git-репозиторію."""
     if root_dir is None:
         root_dir = Path.cwd()
 
     try:
         result = subprocess.run(
-            ["git", "-C", str(root_dir), "ls-files", "-c", "-o", "--exclude-standard"],
+            [
+                "git",
+                "-C",
+                str(root_dir),
+                "ls-files",
+                "-c",
+                "-o",
+                "--exclude-standard",
+            ],
             capture_output=True,
             text=True,
             check=True,
         )
-        files = [f.strip() for f in result.stdout.strip().splitlines() if f.strip()]
+        files = [
+            f.strip()
+            for f in result.stdout.strip().splitlines()
+            if f.strip()
+        ]
     except (subprocess.CalledProcessError, FileNotFoundError):
         files = []
         for p in root_dir.rglob("*"):
@@ -26,7 +41,9 @@ def get_repo_map(root_dir: Path | None = None, max_files: int = 80) -> str:
                     or part in ("__pycache__", "logs", "node_modules")
                     for part in rel_parts
                 ):
-                    files.append(str(p.relative_to(root_dir)))
+                    files.append(
+                        str(p.relative_to(root_dir))
+                    )
         files.sort()
 
     if not files:
@@ -34,8 +51,12 @@ def get_repo_map(root_dir: Path | None = None, max_files: int = 80) -> str:
 
     header = f"=== СТРУКТУРА ПРОЄКТУ (REPO-MAP: {root_dir.name}) ==="
     if len(files) > max_files:
-        shown = "\n".join(f"  - {f}" for f in files[:max_files])
-        footer = f"\n  ... (та ще {len(files) - max_files} файлів)"
+        shown = "\n".join(
+            f"  - {f}" for f in files[:max_files]
+        )
+        footer = (
+            f"\n  ... (та ще {len(files) - max_files} файлів)"
+        )
         return f"{header}\n{shown}{footer}\n"
 
     shown = "\n".join(f"  - {f}" for f in files)
@@ -43,8 +64,11 @@ def get_repo_map(root_dir: Path | None = None, max_files: int = 80) -> str:
 
 
 @lru_cache(maxsize=32)
-def get_repo_diff(root_dir: Path | None = None, max_lines: int = 500) -> str:
-    """Повертає git diff (staged або unstaged) для контексту перевірки коду."""
+def get_repo_diff(
+    root_dir: Path | None = None,
+    max_lines: int = 500
+) -> str:
+    """Повертає git diff для контексту перевірки коду."""
     if root_dir is None:
         root_dir = Path.cwd()
 

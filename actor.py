@@ -3,12 +3,18 @@ import litellm
 from config import ACTOR_MODEL
 
 
-def generate(question: str, strategy_prompt: str = "") -> str:
+def generate(
+    question: str,
+    strategy_prompt: str = ""
+) -> str:
+    """Генерує чернетку відповіді за допомогою актора."""
     messages = [
         {
             "role": "system",
-            "content": strategy_prompt
-            or "You are a precise technical assistant. Never guess when information is missing.",
+            "content": (
+                strategy_prompt
+                or "You are a precise technical assistant."
+            ),
         },
         {
             "role": "user",
