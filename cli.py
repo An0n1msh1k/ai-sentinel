@@ -1,5 +1,4 @@
 import subprocess
-import sys
 from pathlib import Path
 
 import typer
@@ -31,10 +30,57 @@ def check_env_file():
         )
         raise typer.Exit(code=1)
 
+def run_aider(prompt: str) -> int:
+    """Run aider with the given prompt and handle errors."""
+    console.print(f"[dim]Running aider with prompt: {prompt}[/dim]")
+    try:
+        result = subprocess.run(["aider", "--message", prompt], check=False)
+        return result.returncode
+    except FileNotFoundError:
+        console.print("[bold red]❌ Error: 'aider' command not found. Please install it first.[/bold red]")
+        return 1
+
+def run_ruff() -> int:
+    """Run ruff linter check and handle errors."""
+    console.print("[dim]Running linter checks...[/dim]")
+    try:
+        result = subprocess.run(["ruff", "check", "."], check=False)
+        return result.returncode
+    except FileNotFoundError:
+        console.print("[bold yellow]⚠ Warning: 'ruff' command not found. Skipping linting.[/bold yellow]")
+        return 0
+
+def handle_aider_failure(prompt: str):
+    """Handle aider failure with a smart rollback option."""
+    console.print("[bold yellow]⚠ Aider execution failed or was interrupted.[/bold yellow]")
+    discard = typer.confirm("Do you want to discard partial changes?", default=False)
+    if discard:
+        try:
+            subprocess.run(["git", "restore", "."], check=False)
+            subprocess.run(["git", "clean", "-fd"], check=False)
+            console.print("[bold green]✔ Partial changes discarded.[/bold green]")
+        except FileNotFoundError:
+            console.print("[bold red]❌ Error: 'git' command not found.[/bold red]")
+    else:
+        console.print("[bold blue]💡 Changes kept. You can resume later using:[/bold blue]")
+        console.print(f"   [cyan]sentinel dev \"{prompt}\"[/cyan]")
+
 @app.command(help="Run interactive development loop.")
-def dev():
-    """Start the interactive dev loop."""
+def dev(
+    instruction: str = typer.Argument(None, help="Optional instruction"),
+):
+    """Start the interactive dev loop or execute a single instruction."""
     check_env_file()
+    
+    if instruction:
+        console.print("[bold blue]🚀 Starting Sentinel single instruction run...[/bold blue]")
+        returncode = run_aider(instruction)
+        if returncode != 0:
+            handle_aider_failure(instruction)
+            raise typer.Exit(code=returncode)
+        run_ruff()
+        return
+
     console.print("[bold blue]🚀 Starting Sentinel interactive dev loop...[/bold blue]")
     try:
         while True:
@@ -42,10 +88,13 @@ def dev():
             if prompt.lower() in ("exit", "quit"):
                 console.print("[bold green]Exiting dev loop. Goodbye![/bold green]")
                 break
-            console.print(f"[dim]Running aider with prompt: {prompt}[/dim]")
-            subprocess.run(["aider", "--message", prompt], check=False)
-            console.print("[dim]Running linter checks...[/dim]")
-            subprocess.run(["ruff", "check", "."], check=False)
+            
+            returncode = run_aider(prompt)
+            if returncode != 0:
+                handle_aider_failure(prompt)
+                continue
+                
+            run_ruff()
     except (KeyboardInterrupt, EOFError):
         console.print("\n[bold green]Exiting dev loop. Goodbye![/bold green]")
         raise typer.Exit(code=0)
@@ -57,16 +106,21 @@ def check():
     failed = False
     checks = [
         ("Ruff (Linting)", ["ruff", "check", "."]),
-        ("Bandit (Security)", ["bandit", "-r", "-ll", "-ii", "."]),
+        ("Bandit (Security)", ["bandit", "-r", "-ll", "-ii", ".", "--exclude", "./.venv/*,./venv/*"]),
     ]
     for name, cmd in checks:
         console.print(f"\n[bold]Running {name}...[/bold]")
-        result = subprocess.run(cmd, check=False)
-        if result.returncode != 0:
-            console.print(f"[bold red]❌ {name} failed.[/bold red]")
+        try:
+            result = subprocess.run(cmd, check=False)
+            if result.returncode != 0:
+                console.print(f"[bold red]❌ {name} failed.[/bold red]")
+                failed = True
+            else:
+                console.print(f"[bold green]✅ {name} passed.[/bold green]")
+        except FileNotFoundError:
+            console.print(f"[bold red]❌ {name} failed: Command not found.[/bold red]")
             failed = True
-        else:
-            console.print(f"[bold green]✅ {name} passed.[/bold green]")
+            
     if failed:
         raise typer.Exit(code=1)
     else:
@@ -96,7 +150,7 @@ def review(
         else:
             console.print("[bold red]❌ critic.py has no 'audit' function.[/bold red]")
             raise typer.Exit(code=1)
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         console.print(f"[bold red]❌ Error: {e}[/bold red]")
         raise typer.Exit(code=1)
 
