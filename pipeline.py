@@ -9,6 +9,7 @@ from models import Critique
 
 MAX_RETRIES = 2
 
+
 def run_pipeline(prompt: str, strategy: str = "general") -> str:
     print(f"🤖 [Actor] Генерація першої чернетки (стратегія: {strategy})...")
     current_draft = generate(prompt, strategy_prompt=strategy)
@@ -17,13 +18,37 @@ def run_pipeline(prompt: str, strategy: str = "general") -> str:
         print(f"🔍 [Critic] Аудит спроби {attempt}...")
         critique: Critique = audit(prompt, current_draft, strategy)
         
-        # ПРИНЦИП 9: Аварійна зупинка, якщо не вистачає інформації (Pre-Flight Check)
+        # Обробка відсутньої інформації (Pre-Flight Check)
         if critique.missing_info:
-            print("\n⚠️  [АВАРІЙНА ЗУПИНКА] Критик відмовився гадати. Бракує інформації:")
+            print("\n⚠️ [ЗАПИТ УТОЧНЕННЯ] Критик потребує додаткових даних:")
             for item in critique.missing_info:
                 print(f"   - {item}")
-            print("\n👉 Надайте цю інформацію у наступному запиті.")
-            sys.exit(2)
+            
+            if sys.stdin.isatty():
+                try:
+                    user_input = input("\n👉 Введіть уточнення (або натисніть Enter, щоб пропустити і продовжити): ").strip()
+                except (KeyboardInterrupt, EOFError):
+                    user_input = ""
+            else:
+                print("⏩ Неінтерактивний режим (CI/CD): пропускаємо запит уточнення...")
+                user_input = ""
+            
+            if user_input:
+                if user_input.startswith("@") or Path(user_input).is_file():
+                    file_path = Path(user_input.lstrip("@"))
+                    if file_path.is_file():
+                        content = file_path.read_text(encoding="utf-8", errors="replace")
+                        prompt += f"\n\n[ДОДАТКОВИЙ ФАЙЛ ВІД КОРИСТУВАЧА: {file_path.name}]:\n{content}"
+                    else:
+                        print(f"⚠️ Файл {file_path} не знайдено, передаємо як звичайний текст.")
+                        prompt += f"\n\n[УТОЧНЕННЯ]: {user_input}"
+                else:
+                    prompt += f"\n\n[УТОЧНЕННЯ ВІД КОРИСТУВАЧА]: {user_input}"
+                
+                current_draft = generate(prompt, strategy_prompt=strategy)
+                continue
+            else:
+                print("⏩ Ігноруємо запит інформації та продовжуємо аудит...")
             
         # УСПІХ: Якщо бал високий і немає фатальних помилок
         if critique.score >= 95 and not critique.fatal_flaws:
@@ -52,6 +77,7 @@ def run_pipeline(prompt: str, strategy: str = "general") -> str:
             log_iteration(prompt, current_draft, critique, success=False)
             sys.exit(1)
 
+
 def log_iteration(prompt: str, draft: str, critique: Critique, success: bool):
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
@@ -69,6 +95,7 @@ def log_iteration(prompt: str, draft: str, critique: Critique, success: bool):
         "draft": draft
     }
     log_file.write_text(json.dumps(log_data, indent=2, ensure_ascii=False))
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

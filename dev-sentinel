@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+set -e
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [ "$#" -lt 1 ]; then
+    echo "❌ Помилка: Вкажіть завдання для розробки."
+    echo "👉 Використання: ./dev-sentinel <'опис задачі'> [файл1 файл2...]"
+    exit 1
+fi
+
+PROMPT="$1"
+shift
+FILES="$@"
+
+# Динамічно читаємо ACTOR_MODEL з config.py через Python
+# Якщо config.py немає або щось пішло не так, падаємо на дефолт (Groq)
+CONFIG_MODEL=$(python -c "
+import sys
+try:
+    sys.path.append('$DIR')
+    from config import ACTOR_MODEL
+    print(ACTOR_MODEL)
+except Exception:
+    print('groq/llama-3.3-70b-versatile')
+")
+
+MODEL="${AIDER_MODEL:-$CONFIG_MODEL}"
+
+echo "🚀 [Dev-Sentinel] Запуск пайплайну..."
+echo "🤖 [Фаза 1: Кодер] Пишемо код (Модель: $MODEL)..."
+aider --model "$MODEL" --yes --map-tokens 0 -m "$PROMPT" $FILES
+
+echo -e "\n🔍 [Фаза 2: sentinel-check] Перевірка лінтерами та тестами..."
+MAX_RETRIES=2
+ATTEMPT=1
+
+while [ $ATTEMPT -le $MAX_RETRIES ]; do
+    if "$DIR/sentinel-check" > /tmp/sentinel_lint 2>&1; then
+        echo "✅ [Успіх] Код технічно чистий (без синтаксичних помилок)!"
+        rm -f /tmp/sentinel_lint
+        
+        echo -e "\n🛡️ [Фаза 3: Сеньйор-Критик] Аналіз логіки змін..."
+        if "$DIR/sentinel" "Перевір, чи дійсно цей код вирішує задачу: $PROMPT" -d -s code_logic; then
+            echo -e "\n✨ УСПІХ! Код працює, перевірений лінтером і схвалений Сеньйором. Можна робити git commit."
+            exit 0
+        else
+            echo -e "\n❌ [Збій] Сеньйор відхилив зміни. Потрібне доопрацювання."
+            exit 1
+        fi
+    else
+        LINT_ERRORS=$(cat /tmp/sentinel_lint)
+        echo "⚠ [Спроба $ATTEMPT/$MAX_RETRIES] Знайдено синтаксичні помилки. Виправляємо..."
+        FIX_PROMPT="Лінтер видав помилку. ВИПРАВ її. Вивід Ruff/Pytest:\n$LINT_ERRORS"
+        aider --model "$MODEL" --yes --map-tokens 0 -m "$FIX_PROMPT" $FILES
+        
+        ATTEMPT=$((ATTEMPT + 1))
+    fi
+done
+
+echo "❌ [Збій] Не вдалося виправити синтаксис за $MAX_RETRIES спроби."
+rm -f /tmp/sentinel_lint
+exit 1

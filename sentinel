@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Модульний AI Sentinel (Actor-Critic Verifier)
+
+# Автоматично визначаємо директорію скрипта (щоб працювало у будь-кого)
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Використовуємо локальний .venv та локальний main.py
+exec "$DIR/.venv/bin/python" "$DIR/main.py" "$@"

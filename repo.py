@@ -1,4 +1,5 @@
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -39,3 +40,42 @@ def get_repo_map(root_dir: Path | None = None, max_files: int = 80) -> str:
 
     shown = "\n".join(f"  - {f}" for f in files)
     return f"{header}\n{shown}\n"
+
+
+@lru_cache(maxsize=32)
+def get_repo_diff(root_dir: Path | None = None, max_lines: int = 500) -> str:
+    """Повертає git diff (staged або unstaged) для контексту перевірки коду."""
+    if root_dir is None:
+        root_dir = Path.cwd()
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root_dir), "diff", "--cached"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        diff_text = result.stdout.strip()
+
+        if not diff_text:
+            result = subprocess.run(
+                ["git", "-C", str(root_dir), "diff"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            diff_text = result.stdout.strip()
+
+        if not diff_text:
+            return "Активних змін (git diff) не знайдено."
+
+        header = f"=== GIT DIFF ({root_dir.name}) ==="
+        lines = diff_text.splitlines()
+
+        if len(lines) > max_lines:
+            shown = "\n".join(lines[:max_lines])
+            return f"{header}\n{shown}\n... (обрізано)"
+
+        return f"{header}\n{diff_text}"
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return "Помилка отримання git diff."

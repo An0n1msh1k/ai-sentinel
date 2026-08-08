@@ -51,6 +51,7 @@ Rules:
             },
         ],
         temperature=0,
+        response_format={"type": "json_object"},
     )
 
     raw = response.choices[0].message.content.strip()

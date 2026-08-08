@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -e
+
+echo -e "\n🔍 [1/3] Запуск Ruff (лінтинг та форматування)..."
+if command -v ruff >/dev/null 2>&1; then
+    ruff check .
+else
+    echo "⚠️  Ruff не знайдено, пропускаємо..."
+fi
+
+echo -e "\n🔒 [2/3] Запуск Bandit (аналіз безпеки коду)..."
+if command -v bandit >/dev/null 2>&1; then
+    # -c pyproject.toml використовується, якщо є конфіг; інакше перевіряємо .py файли без спаму
+    if [ -f pyproject.toml ]; then
+        bandit -c pyproject.toml -r . -q --exclude "./.venv/*,./venv/*,./test*,./tests/*" || true
+    else
+        bandit -r . -q -ll -ii --exclude "./.venv/*,./venv/*,./test*,./tests/*" || true
+    fi
+else
+    echo "⚠️  Bandit не знайдено, пропускаємо..."
+fi
+
+echo -e "\n🧪 [3/3] Запуск Pytest (тести)..."
+if command -v pytest >/dev/null 2>&1; then
+    # Запускаємо тести лише якщо існує папка tests/ або файли test_*.py
+    if [ -d "tests" ] || ls test_*.py >/dev/null 2>&1 || ls *_test.py >/dev/null 2>&1; then
+        pytest -q
+    else
+        echo "ℹ️  Тести не знайдені (папка tests/ або test_*.py відсутні). Пропускаємо."
+    fi
+else
+    echo "⚠️  Pytest не знайдено, пропускаємо..."
+fi
+
+echo -e "\n✅ Усе чисто! Можна робити git commit."
