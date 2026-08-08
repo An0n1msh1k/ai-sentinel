@@ -1,5 +1,5 @@
-### СТРАТЕГІЯ ВЕРИФІКАЦІЇ: ЛОГІКА КОДУ ТА АРХІТЕКТУРА
-1. **Синтаксис і стандарти:** Код має відповідати PEP 8 (для Python) або сучасним стандартам цільової мови. Ніякого невідсортованого імпорту чи зайвих пробілів.
-2. **Обробка помилок та виключень:** Чи є захист від падінь (наприклад, FileNotFoundError, відсутність з'єднання, вихід за межі масиву)?
-3. **Архітектурна чистота:** Чи не порушує код принцип модульності? Чи немає жорстко зашитих магічних чисел або шляхів?
-4. **Тестованість:** Чи легко покрити цей код тестами?
+### VERIFICATION STRATEGY: CODE LOGIC & ARCHITECTURE
+1. **Syntax & Standards:** Adhere to PEP 8 (Python) or target language standards. No unordered imports or trailing whitespace.
+2. **Error & Exception Handling:** Ensure protection against common runtime exceptions (e.g., FileNotFoundError, connection drops, index out of bounds).
+3. **Architectural Purity:** Maintain modularity. Avoid hardcoded magic numbers or absolute paths.
+4. **Testability:** Ensure code is structured for straightforward unit testing.

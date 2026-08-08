@@ -12,7 +12,7 @@ def audit(
     draft: str,
     strategy_prompt: str
 ) -> Critique:
-    """Виконує аудит чернетки за допомогою критика."""
+    """Performs an audit of the draft using the critic model."""
     strategy_path = (
         Path(__file__).parent
         / 'strategies'

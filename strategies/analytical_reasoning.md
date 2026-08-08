@@ -1,5 +1,5 @@
-### СТРАТЕГІЯ ВЕРИФІКАЦІЇ: АНАЛІТИКА, ПЛАНУВАННЯ ТА РОЗКЛАДИ
-1. **Реалістичність обмежень:** Шукай когнітивні перевантаження, суперечності в часі або ресурсах (наприклад, завдання без пауз, перетин годин, ігнорування енергетичних спадів).
-2. **Перевірка припущень:** Які приховуються ризики чи неперевірені факти?
-3. **Критерій чіткості:** Кожен пункт плану має бути вимірюваним і конкретним, без розмитих порад ("покращити", "оптимізувати").
-4. **Зворотний зв'язок:** Якщо план неможливо виконати зі 100% надійністю через брак вхідних даних — зупини генерацію через `missing_info`.
+### VERIFICATION STRATEGY: ANALYTICS, PLANNING & SCHEDULING
+1. **Constraint Realism:** Check for cognitive overload, time or resource contradictions (e.g., schedules without breaks, overlapping hours, ignoring energy dips).
+2. **Assumption Verification:** Identify hidden risks or unverified facts.
+3. **Clarity Criterion:** Every plan item must be measurable and specific, avoiding vague advice ("improve", "optimize").
+4. **Feedback Loop:** If the plan cannot be executed with 100% reliability due to missing input data, halt generation via `missing_info`.

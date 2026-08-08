@@ -29,45 +29,45 @@ def run_pipeline(
     prompt: str,
     strategy: str = "general"
 ) -> str:
-    """Виконує основний Actor-Critic пайплайн перевірки."""
+    """Executes the Actor-Critic verification pipeline."""
     print(
-        f"🤖 [Actor] Генерація чернетки (стратегія: {strategy})..."
+        f"🤖 [Actor] Generating draft (strategy: {strategy})..."
     )
     current_draft = generate(prompt, strategy_prompt=strategy)
 
     for attempt in range(1, MAX_RETRIES + 2):
-        print(f"🔍 [Critic] Аудит спроби {attempt}...")
+        print(f"🔍 [Critic] Auditing attempt {attempt}...")
         critique: Critique = audit(
             prompt, current_draft, strategy
         )
 
         if critique.missing_info:
             print(
-                "\n⚠️ [ЗАПИТ УТОЧНЕННЯ] Критик потребує даних:"
+                "\n⚠️ [MISSING INFO] Critic requires data:"
             )
             for item in critique.missing_info:
                 print(f"   - {item}")
 
             if not sys.stdin.isatty():
-                print("⏩ Неінтерактивний режим: пропускаємо...")
+                print("⏩ Non-interactive mode: skipping...")
                 user_input = ""
             else:
                 try:
                     user_input = input(
-                        "\n👉 Введіть уточнення: "
+                        "\n👉 Enter clarification: "
                     ).strip()
                 except (KeyboardInterrupt, EOFError):
                     user_input = ""
 
             if not user_input:
-                print("⏩ Ігноруємо запит інформації...")
+                print("⏩ Ignoring information request...")
             else:
                 if not (
                     user_input.startswith("@")
                     or Path(user_input).is_file()
                 ):
                     prompt += (
-                        f"\n\n[УТОЧНЕННЯ КОРИСТУВАЧА]: "
+                        f"\n\n[USER CLARIFICATION]: "
                         f"{user_input}"
                     )
                 else:
@@ -76,10 +76,10 @@ def run_pipeline(
                     )
                     if not file_path.is_file():
                         print(
-                            f"⚠️ Файл {file_path} не знайдено."
+                            f"⚠️ File {file_path} not found."
                         )
                         prompt += (
-                            f"\n\n[УТОЧНЕННЯ]: {user_input}"
+                            f"\n\n[CLARIFICATION]: {user_input}"
                         )
                     elif (
                         file_path.name.lower()
@@ -88,8 +88,8 @@ def run_pipeline(
                         in FORBIDDEN_EXTENSIONS
                     ):
                         print(
-                            f"\n🚨 [БЕЗПЕКА] Заблоковано "
-                            f"чутливий файл: {file_path.name}"
+                            f"\n🚨 [SECURITY] Blocked "
+                            f"sensitive file: {file_path.name}"
                         )
                         continue
                     elif (
@@ -97,7 +97,7 @@ def run_pipeline(
                         > MAX_FILE_SIZE_BYTES
                     ):
                         print(
-                            f"\n🚨 [БЕЗПЕКА] Файл завеликий: "
+                            f"\n🚨 [SECURITY] File too large: "
                             f"{file_path.name}"
                         )
                         continue
@@ -107,7 +107,7 @@ def run_pipeline(
                             errors="replace",
                         )
                         prompt += (
-                            f"\n\n[ФАЙЛ ВІД КОРИСТУВАЧА: "
+                            f"\n\n[USER FILE: "
                             f"{file_path.name}]:\n{content}"
                         )
 
@@ -121,8 +121,8 @@ def run_pipeline(
             and not critique.fatal_flaws
         ):
             print(
-                f"✅ [Успіх] Перевірку пройдено! "
-                f"(Оцінка: {critique.score}/100)"
+                f"✅ [Success] Verification passed! "
+                f"(Score: {critique.score}/100)"
             )
             log_iteration(
                 prompt,
@@ -133,28 +133,28 @@ def run_pipeline(
             return current_draft
 
         print(
-            f"⚠️  [Спроба {attempt}] Оцінка "
-            f"{critique.score}/100. Знайдено проблеми:"
+            f"⚠️  [Attempt {attempt}] Score "
+            f"{critique.score}/100. Issues found:"
         )
         for flaw in critique.fatal_flaws:
             print(f"   ✖ {flaw}")
 
         if attempt <= MAX_RETRIES:
-            print("↻  [Actor] Виправлення зауважень...")
+            print("↻  [Actor] Fixing issues...")
             correction_instructions = "\n".join(
                 critique.corrections
             )
             current_draft = generate(
-                f"ЗАВДАННЯ: {prompt}\n\n"
-                f"ПОПЕРЕДНЯ ЧЕРНЕТКА:\n{current_draft}\n\n"
-                f"ВКАЗІВКИ КРИТИКА:\n"
+                f"TASK: {prompt}\n\n"
+                f"PREVIOUS DRAFT:\n{current_draft}\n\n"
+                f"CRITIC INSTRUCTIONS:\n"
                 f"{correction_instructions}",
                 strategy_prompt=strategy,
             )
         else:
             print(
-                f"⚠️ [BEST EFFORT] Найкраща чернетка "
-                f"(Оцінка: {critique.score}/100):"
+                f"⚠️ [BEST EFFORT] Best draft "
+                f"(Score: {critique.score}/100):"
             )
             print(current_draft)
             log_iteration(
@@ -172,7 +172,7 @@ def log_iteration(
     critique: Critique,
     success: bool,
 ):
-    """Зберігає результати виконання у лог-файл."""
+    """Saves execution results to a log file."""
     log_dir = Path("logs")
     log_dir.mkdir(exist_ok=True)
     timestamp = datetime.datetime.now(
@@ -198,8 +198,8 @@ def log_iteration(
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print(
-            "Використання: python pipeline.py "
-            "'<промпт>' [стратегія]"
+            "Usage: python pipeline.py "
+            "'<prompt>' [strategy]"
         )
         sys.exit(1)
 
@@ -209,5 +209,5 @@ if __name__ == "__main__":
     )
 
     final_output = run_pipeline(user_prompt, strat)
-    print("\n--- ФІНАЛЬНИЙ РЕЗУЛЬТАТ ---")
+    print("\n--- FINAL RESULT ---")
     print(final_output)

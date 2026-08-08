@@ -1,65 +1,39 @@
-# 🛡 AI Sentinel
+# AI Sentinel
 
-> **Ваш локальний AI-асистент для розробки, автоматичного Code Review та контролю якості коду.**
+Local AI assistant for code development, automated code review, and quality control.
 
-AI Sentinel — це модульна екосистема інструментів на базі штучного інтелекту, створена для допомоги розробникам писати чистіший, безпечніший та ефективніший код безпосередньо у вашому середовищі.
-
----
-
-## 🏗 Архітектура проєкту
-
-Проєкт побудований за принципом розділення обов'язків між різними AI-агентами та утилітами перевірки:
+## Architecture
 
 ```text
 ai-sentinel/
-├── dev-sentinel      # 🤖 AI-Кодер та інтерактивний пайплайн генерації коду
-├── sentinel-check    # 🔍 Швидкі локальні лінтери та статичний аналіз
-└── sentinel          # 🧠 Senior-Критик (глибокий рев'ю коду та архітектури)
+├── dev-sentinel      # AI Coder & interactive code generation pipeline
+├── sentinel-check    # Fast local linters and static analysis
+└── sentinel          # Senior Critic (deep code and architecture review)
 ```
 
-1. **`dev-sentinel` (AI-Кодер)** — генерує код та керує потоком розробки.
-2. **`sentinel-check` (Лінтери)** — виконує перевірку синтаксису, форматування та базові тести перед тим, як код потрапить на рев'ю.
-3. **`sentinel` (Senior-Критик)** — аналізує підготовлені зміни (`git diff`), шукає потенційні вразливі місця, баги, проблеми з продуктивністю та дає поради у стилі досвідченого ліда.
-
----
-
-## 📥 Інструкція зі встановлення
-
-Виконайте наступні команди у вашому терміналі:
+## Installation
 
 ```bash
-# 1. Клонуйте репозиторій
-git clone [https://github.com/your-username/ai-sentinel.git](https://github.com/your-username/ai-sentinel.git)
+git clone https://github.com/your-username/ai-sentinel.git
 cd ai-sentinel
-
-# 2. Створіть віртуальне середовище Python
 python -m venv .venv
-
-# 3. Активуйте віртуальне середовище
 source .venv/bin/activate
-
-# 4. Встановіть необхідні залежності
 pip install -r requirements.txt
 ```
 
----
+## Usage
 
-## 🚀 Приклади використання
-
-### 1. Розробка (AI-Кодер)
-Створення нової фічі чи рефакторинг:
+### 1. Development (AI Coder)
 ```bash
-./dev-sentinel "Створи функцію для асинхронного завантаження файлів" my_script.py
+./dev-sentinel "Create an asynchronous file downloader" my_script.py
 ```
 
-### 2. Перевірка коду лінтером
-Швидкий скан проєкту:
+### 2. Linter Check
 ```bash
 ./sentinel-check
 ```
 
-### 3. Проведення AI-Code Review
-Зробіть `git add`, а потім запустіть Senior-Критика:
+### 3. AI Code Review
 ```bash
-./sentinel "Перевір зміни на безпеку та витоки пам'яті" -d
+./sentinel "Review changes for security and memory leaks" -d
 ```

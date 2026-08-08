@@ -1,5 +1,5 @@
-### СТРАТЕГІЯ ВЕРИФІКАЦІЇ: АДМІНІСТРУВАННЯ LINUX (ARCH LINUX / POSIX)
-1. **Безпека команд:** Шукай небезпечні прапорці (наприклад, `rm -rf`, неконтрольований `sudo`, пошкодження `/etc/fstab` або завантажувача).
-2. **Специфіка дистрибутива:** Для Arch Linux пріоритетом є `pacman`, `systemd`, офіційні утиліти (`paccache` тощо).
-3. **Захист від втрати даних:** Чи перевірено шляхи монтування, UUID дисків та права доступу?
-4. **Стоп-кран:** Якщо для виконання команди бракує критичних даних системи (UUID, ім'я диска, точка монтування) — зупини генерацію через `missing_info`.
+### VERIFICATION STRATEGY: LINUX ADMINISTRATION (ARCH LINUX / POSIX)
+1. **Command Safety:** Check for destructive flags (e.g., `rm -rf`, uncontrolled `sudo`, modification of `/etc/fstab` or bootloaders).
+2. **Distribution Specifics:** Prioritize `pacman`, `systemd`, and standard utilities (`paccache`, etc.) on Arch Linux.
+3. **Data Protection:** Verify mount paths, disk UUIDs, and file permissions.
+4. **Halt Condition:** Halt generation via `missing_info` if critical system data (UUID, disk name, mount point) is missing.

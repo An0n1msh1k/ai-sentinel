@@ -6,28 +6,28 @@ from repo import get_repo_diff, get_repo_map
 
 
 def parse_args():
-    """Парсить аргументи командного рядка."""
+    """Parses command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="AI Sentinel — Верифікатор (Actor-Critic)"
+        description="AI Sentinel — Verifier (Actor-Critic)"
     )
     parser.add_argument(
         "prompt",
-        help="Опис задачі або питання для верифікації"
+        help="Task description or verification question"
     )
     parser.add_argument(
         "files",
         nargs="*",
-        help="Файли проєкту для аналітика"
+        help="Project files for analysis"
     )
     parser.add_argument(
         "-m", "--map",
         action="store_true",
-        help="Додати структуру Git-репозиторію"
+        help="Include Git repository structure"
     )
     parser.add_argument(
         "-d", "--diff",
         action="store_true",
-        help="Додати git diff у контекст"
+        help="Include git diff in context"
     )
     strategy_dir = Path(__file__).parent / 'strategies'
     strategies = [
@@ -37,7 +37,7 @@ def parse_args():
         "-s", "--strategy",
         default="general",
         choices=strategies,
-        help="Спеціалізована стратегія перевірки"
+        help="Specialized verification strategy"
     )
     return parser.parse_args()
 
@@ -48,7 +48,7 @@ def build_context(
     include_map: bool = False,
     include_diff: bool = False
 ) -> str:
-    """Формує загальний контекст для виконання запиту."""
+    """Builds the overall context for execution."""
     context_parts = []
     if include_map:
         context_parts.append(get_repo_map())
@@ -59,7 +59,7 @@ def build_context(
         context_parts.append(prompt)
     else:
         context_parts.append(
-            f"ЗАВДАННЯ: {prompt}\n\nКОНТЕКСТ ФАЙЛІВ ПРОЄКТУ:"
+            f"TASK: {prompt}\n\nPROJECT FILE CONTEXT:"
         )
         for fp in file_paths:
             path = Path(fp)
@@ -68,11 +68,11 @@ def build_context(
                     encoding="utf-8", errors="replace"
                 )
                 context_parts.append(
-                    f"--- ФАЙЛ: {path.name} ---\n{content}\n"
+                    f"--- FILE: {path.name} ---\n{content}\n"
                 )
             else:
                 print(
-                    f"⚠️ Попередження: Файл {fp} не знайдено."
+                    f"⚠️ Warning: File {fp} not found."
                 )
 
     if include_map or include_diff:
@@ -81,7 +81,7 @@ def build_context(
 
 
 def main():
-    """Точка входу в застосунок."""
+    """Application entry point."""
     args = parse_args()
     full_prompt = build_context(
         args.prompt,
@@ -91,14 +91,14 @@ def main():
     )
 
     print(
-        f"🚀 [AI Sentinel] Запуск (Стратегія: {args.strategy})..."
+        f"🚀 [AI Sentinel] Running (Strategy: {args.strategy})..."
     )
     result = run_pipeline(
         full_prompt, strategy=args.strategy
     )
 
     print("\n==========================================")
-    print("           ВЕРИФІКОВАНИЙ РЕЗУЛЬТАТ        ")
+    print("             VERIFIED RESULT              ")
     print("==========================================")
     print(result)
 

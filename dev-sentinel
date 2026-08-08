@@ -3,18 +3,18 @@ set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Interactive mode if no args provided
 if [ "$#" -lt 1 ]; then
-    echo "❌ Помилка: Вкажіть завдання для розробки."
-    echo "👉 Використання: ./dev-sentinel <'опис задачі'> [файл1 файл2...]"
-    exit 1
+    echo "--- AI Sentinel ---"
+    read -p "Task: " PROMPT
+    [ -z "$PROMPT" ] && echo "Aborted." && exit 1
+    read -p "Files (leave blank for auto): " FILES_ARGS
+else
+    PROMPT="$1"
+    shift
+    FILES_ARGS="$@"
 fi
 
-PROMPT="$1"
-shift
-FILES="$@"
-
-# Динамічно читаємо ACTOR_MODEL з config.py через Python
-# Якщо config.py немає або щось пішло не так, падаємо на дефолт (Groq)
 CONFIG_MODEL=$(python -c "
 import sys
 try:
@@ -24,40 +24,45 @@ try:
 except Exception:
     print('groq/llama-3.3-70b-versatile')
 ")
-
 MODEL="${AIDER_MODEL:-$CONFIG_MODEL}"
 
-echo "🚀 [Dev-Sentinel] Запуск пайплайну..."
-echo "🤖 [Фаза 1: Кодер] Пишемо код (Модель: $MODEL)..."
-aider --model "$MODEL" --yes --map-tokens 0 -m "$PROMPT" $FILES
+echo "[1/3] Coder ($MODEL)..."
+if ! aider --model "$MODEL" --yes --map-tokens 0 -m "$PROMPT" $FILES_ARGS; then
+    echo "[!] Coder failed. Rolling back..."
+    [ -n "$FILES_ARGS" ] && git restore $FILES_ARGS || true
+    exit 1
+fi
 
-echo -e "\n🔍 [Фаза 2: sentinel-check] Перевірка лінтерами та тестами..."
-MAX_RETRIES=2
 ATTEMPT=1
+MAX_RETRIES=2
 
 while [ $ATTEMPT -le $MAX_RETRIES ]; do
+    echo "[2/3] Linter (Attempt $ATTEMPT/$MAX_RETRIES)..."
     if "$DIR/sentinel-check" > /tmp/sentinel_lint 2>&1; then
-        echo "✅ [Успіх] Код технічно чистий (без синтаксичних помилок)!"
+        echo "[+] Linter passed."
         rm -f /tmp/sentinel_lint
         
-        echo -e "\n🛡️ [Фаза 3: Сеньйор-Критик] Аналіз логіки змін..."
-        if "$DIR/sentinel" "Перевір, чи дійсно цей код вирішує задачу: $PROMPT" -d -s code_logic; then
-            echo -e "\n✨ УСПІХ! Код працює, перевірений лінтером і схвалений Сеньйором. Можна робити git commit."
+        echo "[3/3] Critic..."
+        if "$DIR/sentinel" "Verify task: $PROMPT" -d -s code_logic; then
+            echo "[+] Success. Ready to commit."
             exit 0
         else
-            echo -e "\n❌ [Збій] Сеньйор відхилив зміни. Потрібне доопрацювання."
+            echo "[!] Critic rejected changes."
             exit 1
         fi
     else
         LINT_ERRORS=$(cat /tmp/sentinel_lint)
-        echo "⚠ [Спроба $ATTEMPT/$MAX_RETRIES] Знайдено синтаксичні помилки. Виправляємо..."
-        FIX_PROMPT="Лінтер видав помилку. ВИПРАВ її. Вивід Ruff/Pytest:\n$LINT_ERRORS"
-        aider --model "$MODEL" --yes --map-tokens 0 -m "$FIX_PROMPT" $FILES
-        
+        echo "[!] Linter failed. Fixing..."
+        if ! aider --model "$MODEL" --yes --map-tokens 0 -m "Fix linter errors: $LINT_ERRORS" $FILES_ARGS; then
+             echo "[!] Fix failed. Rolling back..."
+             [ -n "$FILES_ARGS" ] && git restore $FILES_ARGS || true
+             exit 1
+        fi
         ATTEMPT=$((ATTEMPT + 1))
     fi
 done
 
-echo "❌ [Збій] Не вдалося виправити синтаксис за $MAX_RETRIES спроби."
+echo "[!] Max retries reached. Rolling back..."
+[ -n "$FILES_ARGS" ] && git restore $FILES_ARGS || true
 rm -f /tmp/sentinel_lint
 exit 1

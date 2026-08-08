@@ -7,7 +7,7 @@ def get_repo_map(
     root_dir: Path | None = None,
     max_files: int = 80
 ) -> str:
-    """Повертає чисту структуру Git-репозиторію."""
+    """Returns a clean Git repository structure."""
     if root_dir is None:
         root_dir = Path.cwd()
 
@@ -49,13 +49,13 @@ def get_repo_map(
     if not files:
         return ""
 
-    header = f"=== СТРУКТУРА ПРОЄКТУ (REPO-MAP: {root_dir.name}) ==="
+    header = f"=== PROJECT STRUCTURE (REPO-MAP: {root_dir.name}) ==="
     if len(files) > max_files:
         shown = "\n".join(
             f"  - {f}" for f in files[:max_files]
         )
         footer = (
-            f"\n  ... (та ще {len(files) - max_files} файлів)"
+            f"\n  ... (and {len(files) - max_files} more files)"
         )
         return f"{header}\n{shown}{footer}\n"
 
@@ -68,7 +68,7 @@ def get_repo_diff(
     root_dir: Path | None = None,
     max_lines: int = 500
 ) -> str:
-    """Повертає git diff для контексту перевірки коду."""
+    """Returns git diff for code verification context."""
     if root_dir is None:
         root_dir = Path.cwd()
 
@@ -91,15 +91,15 @@ def get_repo_diff(
             diff_text = result.stdout.strip()
 
         if not diff_text:
-            return "Активних змін (git diff) не знайдено."
+            return "No active changes (git diff) found."
 
         header = f"=== GIT DIFF ({root_dir.name}) ==="
         lines = diff_text.splitlines()
 
         if len(lines) > max_lines:
             shown = "\n".join(lines[:max_lines])
-            return f"{header}\n{shown}\n... (обрізано)"
+            return f"{header}\n{shown}\n... (truncated)"
 
         return f"{header}\n{diff_text}"
     except (subprocess.SubprocessError, FileNotFoundError):
-        return "Помилка отримання git diff."
+        return "Error retrieving git diff."
