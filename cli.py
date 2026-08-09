@@ -1,15 +1,11 @@
 import subprocess
+import time
 from pathlib import Path
 
 import typer
 from rich.console import Console
 from rich.panel import Panel
 
-app = typer.Typer(
-    help="CLI tool for AI development, linting, and review.",
-    add_completion=False,
-)
-console = Console()
 
 def check_env_file():
     """Proactive .env checker that verifies environment variables."""
@@ -30,15 +26,25 @@ def check_env_file():
         )
         raise typer.Exit(code=1)
 
+app = typer.Typer(
+    help="CLI tool for AI development, linting, and review.",
+    add_completion=False,
+)
+console = Console()
+
 def run_aider(prompt: str) -> int:
     """Run aider with the given prompt and handle errors."""
-    console.print(f"[dim]Running aider with prompt: {prompt}[/dim]")
+    console.print("[dim]Running Actor...[/dim]")
     try:
-        result = subprocess.run(["aider", "--message", prompt], check=False)
+        result = subprocess.run(
+            ["aider", "--message", prompt],
+            check=False,
+        )
         return result.returncode
     except FileNotFoundError:
         console.print("[bold red]❌ Error: 'aider' command not found. Please install it first.[/bold red]")
         return 1
+
 
 def run_ruff() -> int:
     """Run ruff linter check and handle errors."""
@@ -49,6 +55,121 @@ def run_ruff() -> int:
     except FileNotFoundError:
         console.print("[bold yellow]⚠ Warning: 'ruff' command not found. Skipping linting.[/bold yellow]")
         return 0
+
+
+def plan_task(instruction: str) -> list[str]:
+    """Розбиває завдання на кроки за допомогою aider та git diff."""
+    prompt = f"Break down the following task into 3-5 sequential steps. Return ONLY a numbered list, one step per line. No explanations. Task: {instruction}"
+    res_code = run_aider(prompt)
+    if res_code != 0:
+        return [instruction]
+    
+    diff_result = subprocess.run(
+        ["git", "diff"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    diff_text = diff_result.stdout or ""
+    
+    steps = []
+    for line in diff_text.splitlines():
+        # Шукаємо рядки, що виглядають як пункти або змінений текст з кроками
+        stripped = line.strip()
+        if stripped.startswith("+") and not stripped.startswith("+++"):
+            cleaned = stripped[1:].strip()
+            if cleaned and any(cleaned.startswith(f"{i}.") for i in range(1, 10)):
+                steps.append(cleaned.split(".", 1)[1].strip())
+            elif cleaned:
+                steps.append(cleaned)
+
+    if not steps:
+        return [instruction]
+    return steps
+
+
+def auto_critic(instruction: str, skip_retry: bool = False) -> dict | None:
+    """
+    Неінтерактивний виклик Senior Critic.
+    Повертає словник з оцінкою та зауваженнями, або None при помилці.
+    """
+    console.print("[magenta]🕵 Running Senior Critic review...[/magenta]")
+
+    # Отримуємо diff для контексту
+    diff_result = subprocess.run(
+        ["git", "diff"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    draft = diff_result.stdout or "No diff available."
+
+    try:
+        import critic
+
+        critique = critic.audit(
+            question=instruction,
+            draft=draft,
+            strategy_prompt="general",
+        )
+
+        score_color = (
+            "green" if critique.score >= 80
+            else "yellow" if critique.score >= 50
+            else "red"
+        )
+
+        console.print(
+            Panel(
+                f"[bold]Critic Score:[/bold] [{score_color}]{critique.score}/100[/{score_color}]\n\n"
+                f"[bold]Fatal Flaws:[/bold]\n"
+                + ("\n".join(f"• {f}" for f in critique.fatal_flaws) if critique.fatal_flaws else "None")
+                + "\n\n"
+                "[bold]Missing Info:[/bold]\n"
+                + ("\n".join(f"• {i}" for i in critique.missing_info) if hasattr(critique, 'missing_info') and critique.missing_info else "None")
+                + "\n\n"
+                f"[bold]Corrections:[/bold]\n{critique.corrections}",
+                title="[bold magenta]Senior Critic Verdict[/bold magenta]",
+                expand=False,
+            )
+        )
+
+        has_corrections = bool(critique.corrections)
+        if isinstance(critique.corrections, str):
+            has_corrections = critique.corrections.strip().lower() not in ("", "none", "none.")
+
+        if not skip_retry and critique.score < 70 and has_corrections:
+            console.print("[cyan]🔁 Sending to Actor for corrections...[/cyan]")
+            flaws_str = ", ".join(critique.fatal_flaws) if critique.fatal_flaws else "None"
+            run_aider(
+                f"The Senior Critic reviewed your code. Score: {critique.score}/100. "
+                f"Fatal flaws: {flaws_str}. Corrections needed: {critique.corrections}. "
+                "Fix ONLY the issues mentioned by the Critic. Do not change anything else."
+            )
+            run_ruff()
+            retry_result = auto_critic(instruction, skip_retry=True)
+            if retry_result and retry_result["score"] >= 70:
+                console.print("[bold green]✅ Correction successful[/bold green]")
+            else:
+                console.print("[bold yellow]⚠ Score still below threshold after retry[/bold yellow]")
+            return retry_result
+        elif critique.score < 70:
+            console.print("[bold yellow]⚠ Score below threshold — consider manual review.[/bold yellow]")
+
+        return {
+            "score": critique.score,
+            "flaws": critique.fatal_flaws,
+            "corrections": critique.corrections,
+        }
+
+    except Exception as exc:  # noqa: BLE001
+        error_msg = str(exc)
+        if "429" in error_msg or "RateLimit" in error_msg or "Quota exceeded" in error_msg:
+            console.print("[bold yellow]⏳ Critic rate limited — skipping review.[/bold yellow]")
+        else:
+            console.print(f"[bold red]❌ Critic error: {error_msg}[/bold red]")
+        return None
+
 
 def handle_aider_failure(prompt: str):
     """Handle aider failure with a smart rollback option."""
@@ -65,20 +186,33 @@ def handle_aider_failure(prompt: str):
         console.print("[bold blue]💡 Changes kept. You can resume later using:[/bold blue]")
         console.print(f"   [cyan]sentinel dev \"{prompt}\"[/cyan]")
 
+
 @app.command(help="Run interactive development loop.")
 def dev(
     instruction: str = typer.Argument(None, help="Optional instruction"),
 ):
     """Start the interactive dev loop or execute a single instruction."""
     check_env_file()
-    
+
     if instruction:
         console.print("[bold blue]🚀 Starting Sentinel single instruction run...[/bold blue]")
-        returncode = run_aider(instruction)
-        if returncode != 0:
-            handle_aider_failure(instruction)
-            raise typer.Exit(code=returncode)
-        run_ruff()
+        word_count = len(instruction.split())
+        if word_count > 30:
+            steps = plan_task(instruction)
+            for step in steps:
+                returncode = run_aider(step)
+                if returncode != 0:
+                    handle_aider_failure(step)
+                    raise typer.Exit(code=returncode)
+                run_ruff()
+                time.sleep(3)
+        else:
+            returncode = run_aider(instruction)
+            if returncode != 0:
+                handle_aider_failure(instruction)
+                raise typer.Exit(code=returncode)
+            run_ruff()
+        auto_critic(instruction) # Senior-перевірка після кодування
         return
 
     console.print("[bold blue]🚀 Starting Sentinel interactive dev loop...[/bold blue]")
@@ -88,16 +222,33 @@ def dev(
             if prompt.lower() in ("exit", "quit"):
                 console.print("[bold green]Exiting dev loop. Goodbye![/bold green]")
                 break
-            
-            returncode = run_aider(prompt)
-            if returncode != 0:
-                handle_aider_failure(prompt)
-                continue
-                
-            run_ruff()
+
+            word_count = len(prompt.split())
+            if word_count > 30:
+                steps = plan_task(prompt)
+                failed = False
+                for step in steps:
+                    returncode = run_aider(step)
+                    if returncode != 0:
+                        handle_aider_failure(step)
+                        failed = True
+                        break
+                    run_ruff()
+                    time.sleep(3)
+                if failed:
+                    continue
+            else:
+                returncode = run_aider(prompt)
+                if returncode != 0:
+                    handle_aider_failure(prompt)
+                    continue
+
+                run_ruff()
+            auto_critic(prompt)  # Senior-перевірка після кодування
     except (KeyboardInterrupt, EOFError):
         console.print("\n[bold green]Exiting dev loop. Goodbye![/bold green]")
         raise typer.Exit(code=0)
+
 
 @app.command(help="Run static analysis and tests.")
 def check():
@@ -120,11 +271,12 @@ def check():
         except FileNotFoundError:
             console.print(f"[bold red]❌ {name} failed: Command not found.[/bold red]")
             failed = True
-            
+
     if failed:
         raise typer.Exit(code=1)
     else:
         console.print("\n[bold green]🎉 All checks passed successfully![/bold green]")
+
 
 @app.command(help="Run audit using critic.py.")
 def review(
@@ -150,7 +302,7 @@ def review(
         else:
             console.print("[bold red]❌ critic.py has no 'audit' function.[/bold red]")
             raise typer.Exit(code=1)
-    except Exception as e: # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
         error_msg = str(e)
         if "429" in error_msg or "RateLimit" in error_msg or "Quota exceeded" in error_msg:
             console.print(Panel(
@@ -166,11 +318,13 @@ def review(
             console.print(f"[bold red]❌ Error: {error_msg}[/bold red]")
         raise typer.Exit(code=1)
 
+
 @app.callback(invoke_without_command=True)
 def main(ctx: typer.Context):
     """AI Sentinel CLI."""
     if ctx.invoked_subcommand is None:
         console.print(Panel("Run [bold cyan]sentinel --help[/bold cyan] for commands.", title="🛡️ AI Sentinel"))
+
 
 if __name__ == "__main__":
     app()
